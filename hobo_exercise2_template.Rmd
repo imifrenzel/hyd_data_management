@@ -1,7 +1,7 @@
 ---
 title: 'Exercise #2'
-author: "Your name"
-date: "date of submission"
+author: "Immanuel Frenzel"
+date: "12.01.2022"
 output:
   pdf_document: default
   html_document: default
