@@ -46,14 +46,15 @@ data <- data %>%
 
 **Question**: How many data points are outside the measurement range?
 
-**Answer**: 0, all 77 Values are NAs
-
 ```{r, eval = TRUE}
 sum <- summarise(data, QCP_1 = sum(QCP_1, na.rm = TRUE))
 length(data$QCP_1) - sum
 
 summary(data)
 ```
+
+**Answer**: 0, all 77 Values are NAs
+
 
 ### 1.2 Plausible rate of change
 
@@ -64,7 +65,7 @@ data <- data %>%
 
 **Question**: Describe shortly how many data points failed during this QCP and discuss whether there is a certain daytime pattern of failure or not?
 
-**Answer**: 8 points failed QCP_2. Looks like it often happens befor midday, but there is no clear pattern to the data.
+**Answer**: 8 points failed QCP_2. Looks like it often happens before midday, but there is no clear pattern to the data.
 
 ```{r, eval = TRUE}
 sum2 <- summarise(data, QCP_2 = sum(QCP_2, na.rm = TRUE))
@@ -143,8 +144,7 @@ ggplot(a, mapping = aes(x = name, y = value)) +
   geom_col() +
   theme_bw()
 
-filter(data, QCP_2 == 0)
-filter(data, QCP_3 == 0)
+summary(data)
 ```
 
 **Task**: Present a table or graph to show how many data points fail during the four specific QCPs. Discuss shortly the reasons for failure and compare the different QCPs against each other.
@@ -158,6 +158,8 @@ filter(data, QCP_3 == 0)
 ```{r res1}
 qc_df <- data %>% 
   mutate(QCP_total = ifelse(QCP_1 + QCP_2 + QCP_3 + QCP_4 < 4, 0, 1))
+
+head(qc_df)
 ```
 
 **Task**: At the end of the code section above you should generate one! tibble or data.frame named `qc_df` with all time information, all data points (temperature and lux) and your outcomes of the different QCPs.
@@ -168,8 +170,10 @@ qc_df <- data %>%
 hobo_hourly <- qc_df %>% 
   mutate(hour = cut(dttm, breaks = "hour")) %>% 
   group_by(hour) %>% 
-  summarise(date_time = first(hour), th = round(ifelse(sum(QCP_total) < 6, NA, mean(temp)), digits = 3)) %>% 
+  summarise(date_time = first(hour), th = round(ifelse(sum(QCP_total) < 6, NA, mean(temp)), digits = 4)) %>% 
   select("date_time", "th")
+
+head(hobo_hourly)
 ```
 
 **Task**: At the end of the code section above you should generate one! tibble or data.frame named `hobo_hourly` with averaged temperature values per hour or NA values (if the hour is flagged as bad data). See exercise description for more details.
