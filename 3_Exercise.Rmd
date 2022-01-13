@@ -11,20 +11,73 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Loaded packages
 
-```{r libraries}
+```{r libraries, echo = FALSE}
 library("lubridate")
 library("tidyverse")
 library("zoo")
 library("tibbletime")
 ```
 
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r cleanspace, echo = FALSE}
+rm(list=ls())
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r import}
+my_hobo <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/processed10610854.csv")
+my_hobo <- my_hobo %>% 
+  mutate(dttm = ymd_hms(date_time)) %>% 
+  mutate(my_hobo = th) %>% 
+  select("dttm", "my_hobo")
+
+dwd_airport <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/dwd_airport.csv")
+dwd_airport <- dwd_airport %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+dwd_urban <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/dwd_urban.csv")
+dwd_urban <- dwd_urban %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+uni_meteo <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/uni_meteo.csv")
+uni_meteo <- uni_meteo %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+wbi <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/wbi.csv")
+wbi <- wbi %>% 
+  mutate(dttm = ymd_hms(dttm))
+```
+
+```{r join}
+data <- left_join(my_hobo, dwd_airport, by = "dttm") %>% 
+  left_join(., dwd_urban, by = "dttm") %>% 
+  left_join(., uni_meteo, by = "dttm") %>% 
+  left_join(., wbi, by = "dttm")
+
+```
+
+```{r join}
+data_long <- data %>%
+pivot_longer(cols = -c(dttm), 
+names_to = "station",
+values_to = "temp")
+
+head(data_long)
+```
+
+```{r plot}
+ggplot(data = data_long, aes(x = dttm, y = temp)) +
+  geom_line(aes(lty = station, colour = station)) +
+  theme_bw() +
+  labs(title = "Comparison across stations",
+    x = "Date", y = "Temperature (°C)")
+
+```
+
+
+```{r join}
+
+```
+```{r join}
+
+```
+## Including Plots
+
