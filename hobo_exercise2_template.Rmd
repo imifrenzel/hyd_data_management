@@ -19,87 +19,145 @@ knitr::opts_chunk$set(echo = TRUE)
 ### Loaded packages
 
 ```{r libraries}
-# Load all packages here, consider to mute output of this code chunk
-# https://rmarkdown.rstudio.com/lesson-3.html
+library("lubridate")
+library("tidyverse")
+library("zoo")
+library("tibbletime")
 ```
 
-### Preprocessing / R functions
-
-```{r preprocessing_or_functions, message=FALSE, warning=FALSE}
-# If data preprocessing is needed, do it here.
-# If you have specific functions, placed them here.
-# If this code chunk is not needed, delete it.
-```
 
 ## 1. Quality control procedures (4 QCPs)
 
-```{r, eval = FALSE}
-# Load data from Github (then eval = TRUE)
-data <- read_...('http://........')
-head(data)
+```{r, eval = TRUE}
+#import
+reimport <- read.csv("C:/Users/Imifr/Documents/Github/hyd_data_management/10610854.csv")
+
+#time in POSIXct
+data <- reimport %>% 
+  mutate(dttm = ymd_hm(reimport$dttm))
 ```
 
 ### 1.1 Measurement range (Plausible values)
 
-```{r qcp1, eval = FALSE}
-# code for qcp2 here, e.g.: (set eval = TRUE to activate the code chunk)
-data %>%
-  mutate(var1 = ...) %>% 
-  group_by(var2) %>% 
-  mutate(var3 = ...) %>% 
-  summarise(var4 = ..., .groups = 'drop') 
-
-qcp2 <- data %>% summarise(...)
+```{r qcp1, eval = TRUE}
+data <- data %>%
+  mutate(QCP_1 = if_else(temp <= -20 | temp >= 70, 0, 1))
 ```
 
 **Question**: How many data points are outside the measurement range?
 
-**Answer**:
+**Answer**: 0, all 77 Values are NAs
+
+```{r, eval = TRUE}
+sum <- summarise(data, QCP_1 = sum(QCP_1, na.rm = TRUE))
+length(data$QCP_1) - sum
+
+summary(data)
+```
 
 ### 1.2 Plausible rate of change
 
 ```{r qcp2}
-# code for qcp1 here
+data <- data %>%
+  mutate(QCP_2 = ifelse(between(temp - lag(temp), -1, 1), 1, 0))
 ```
 
 **Question**: Describe shortly how many data points failed during this QCP and discuss whether there is a certain daytime pattern of failure or not?
 
-**Answer**:
+**Answer**: 8 points failed QCP_2. Looks like it often happens befor midday, but there is no clear pattern to the data.
+
+```{r, eval = TRUE}
+sum2 <- summarise(data, QCP_2 = sum(QCP_2, na.rm = TRUE))
+length(data$QCP_2) - sum2
+summary(data)
+
+filter(data, QCP_2 == 0)
+```
 
 ### 1.3 Minimum variability (Persistence)
 
 ```{r qcp3}
-# code for qcp3 here
+data <- data %>%
+  mutate(QCP_3 = ifelse((temp == lag(temp)) +
+                        (temp == lag(temp, n = 2)) +
+                        (temp == lag(temp, n = 3)) +
+                        (temp == lag(temp, n = 4)) +
+                        (temp == lag(temp, n = 5)) == 5, 0, 1 
+                        ))
 ```
 
 **Task**: Code in this section should analyses the persistance.
 
+```{r}
+filter(data, QCP_3 == 0)
+```
+
+
+
 ### 1.4 Light intensity
 
 ```{r qcp4}
-# code for qcp4 here
+data <- data %>%
+  mutate(SIC = case_when(lux < 0 ~ "NA",
+                         lux < 10 ~ "night",
+                         lux < 500 ~ "sun_rise_or_set",
+                         lux < 2000 ~ "overcast_full",
+                         lux < 15000 ~ "overcast_light",
+                         lux < 20000 ~ "clear_sky_shady",
+                         lux < 50000 ~ "sunshine",
+                         lux >= 50000 ~ "sunshine_bright")) %>% 
+  mutate(QCP_4 = case_when(is.na(SIC) ~ as.double(NA),
+                           hour(dttm) < 6 | hour(dttm) >= 18 ~ 1, #set all QCP_4 values for nighttime to 1
+                           lag(SIC, n = 3) == "sunshine_bright" ~ 0, #set 0 if sunshine_bright +- 3 before or ahead
+                           lag(SIC, n = 2) == "sunshine_bright" ~ 0,
+                           lag(SIC) == "sunshine_bright" ~ 0,
+                           SIC == "sunshine_bright" ~ 0,
+                           lead(SIC) == "sunshine_bright" ~ 0,
+                           lead(SIC, n = 2) == "sunshine_bright" ~ 0,
+                           lead(SIC, n = 3) == "sunshine_bright" ~ 0, #set 0 if sunshine +- 1 before or ahead
+                           lag(SIC) == "sunshine" ~ 0,
+                           SIC == "sunshine" ~ 0,
+                           lead(SIC) == "sunshine" ~ 0,
+                           TRUE ~ 1)) 
 ```
 
 **Task**: Discuss shortly how often and when during daytime the QCP4 flags bad data. Elaborate on some reasons for your results.
 
-**Answer**:
+```{r}
+summary(data)
+ggplot(data, mapping = aes(x = SIC)) +
+  geom_bar() +
+  theme_bw()
+```
+
+**Answer**: 0,  It seems like there was not much light at the sensor location.
 
 ## 2. Synthesis
 
 ```{r synthesis}
-# code for synthesis here
+a <- data %>% 
+  summarise_at(vars(QCP_1 , QCP_2, QCP_3, QCP_4), ~ sum(.x == 0, na.rm = TRUE)) %>% 
+  pivot_longer(cols = QCP_1:QCP_4)
+
+ggplot(a, mapping = aes(x = name, y = value)) +
+  geom_col() +
+  theme_bw()
+
+filter(data, QCP_2 == 0)
+filter(data, QCP_3 == 0)
 ```
 
 **Task**: Present a table or graph to show how many data points fail during the four specific QCPs. Discuss shortly the reasons for failure and compare the different QCPs against each other.
 
-**Answer**:
+**Answer**:  Reasons for failure were sudden temperature changes (QCP_2, 8 points) and constant temperature over at least one hour (QCP_3, 60 points). All temperature readings were in the measurement-interval (QCP_1). The sensor never experienced more than 5166.7 lux (QCP_4) which was not enough for not passing the checkpoint.
 
 ## 3. Results
 
 ### 3.1 Result (Flagging system: 10-minutes-values)
 
 ```{r res1}
-# code for results here
+qc_df <- data %>% 
+  mutate(QCP_total = ifelse(QCP_1 + QCP_2 + QCP_3 + QCP_4 < 4, 0, 1))
 ```
 
 **Task**: At the end of the code section above you should generate one! tibble or data.frame named `qc_df` with all time information, all data points (temperature and lux) and your outcomes of the different QCPs.
@@ -107,7 +165,11 @@ qcp2 <- data %>% summarise(...)
 ### 3.2 Result (Aggregate to hourly series)
 
 ```{r res2}
-# code for results here
+hobo_hourly <- qc_df %>% 
+  mutate(hour = cut(dttm, breaks = "hour")) %>% 
+  group_by(hour) %>% 
+  summarise(date_time = first(hour), th = round(ifelse(sum(QCP_total) < 6, NA, mean(temp)), digits = 3)) %>% 
+  select("date_time", "th")
 ```
 
 **Task**: At the end of the code section above you should generate one! tibble or data.frame named `hobo_hourly` with averaged temperature values per hour or NA values (if the hour is flagged as bad data). See exercise description for more details.
