@@ -27,8 +27,8 @@ summary(data)
 data <- data %>%
   mutate(QCP_2 = ifelse(between(temp - lag(temp), -1, 1), 1, 0))
 
-sum2 <- summarise(data, QCP_2 = sum(QCP_2, na.rm = TRUE))
-length(data$QCP_2) - sum2
+summarise(data, QCP_2 = sum(QCP_2 == 0, na.rm = TRUE))
+filter(data, QCP_2 == 0)
 summary(data)
 
 #QCP_3
@@ -88,7 +88,7 @@ qc_df <- data %>%
 hobo_hourly <- qc_df %>% 
   mutate(hour = cut(dttm, breaks = "hour")) %>% 
   group_by(hour) %>% 
-  summarise(date_time = first(hour), th = round(ifelse(sum(QCP_total) < 6, NA, mean(temp)), digits = 3)) %>% 
+  summarise(date_time = first(hour), th = round(ifelse(sum(QCP_total) < 6, NA, mean(temp)), digits = 4)) %>% 
   select("date_time", "th")
 
 
