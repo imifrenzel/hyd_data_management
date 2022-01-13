@@ -15,6 +15,7 @@ rawdata <- read.csv("https://raw.githubusercontent.com/data-hydenv/data/master/h
 
 #name colums
 rawdata <- rawdata %>%
+  rename("id" = names(rawdata)[1]) %>%
   rename("charDTTM" = names(rawdata)[2]) %>% 
   rename("temp" = names(rawdata)[3]) %>% 
   rename("lux" = names(rawdata)[4])
@@ -32,7 +33,10 @@ rawdata <- rawdata %>%
                         by = '10 mins'))
 
 #delete 2 row at 2021-12-22 because of sensor readout
-rawdata <- rawdata[-c(1355, 1357), ]
+rawdata <- rawdata[-c(1355, 1357), ] 
+rawdata <- rawdata %>% 
+  mutate(temp = ifelse(id <= 3954 & id >= 3713, NA, temp))
+
 
 #shaping the exportfile
 export <- rawdata %>%
