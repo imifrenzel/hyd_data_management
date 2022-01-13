@@ -23,13 +23,17 @@ rawdata <- rawdata %>%
 rawdata <- rawdata %>% 
   mutate(posDTTM = ymd_hms(parse_date_time(rawdata$charDTTM, "%d/%m/%Y %H:%M:%S")))
 
-#using the tibbletime package function filtertime to selsct the range of my data
+#using the tibbletime package function filtertime to select the range of my data
 rawdata <- filter_time(tbl_time(rawdata, posDTTM), '2021-12-13 00:00:00' ~ '2022-01-09 10:30:00') 
 
 #my data is incompete -> adding the missing rows
 rawdata <- rawdata %>% 
   add_row(posDTTM = seq(ymd_hms('2022-01-09 10:40:00'), ymd_hms('2022-01-09 23:00:00'),                        
                         by = '10 mins'))
+
+#delete 2 row at 2021-12-22 because of sensor readout
+rawdata <- rawdata[-c(1355, 1357), ]
+
 #shaping the exportfile
 export <- rawdata %>%
   mutate("dttm" = format(as.POSIXct(rawdata$posDTTM), "%Y-%m-%d %H:%M"), id = 1:length(rawdata$posDTTM)) %>% 
