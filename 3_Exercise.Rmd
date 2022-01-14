@@ -23,7 +23,7 @@ rm(list=ls())
 ```
 
 ```{r import}
-my_hobo <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/processed10610854.csv")
+my_hobo <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/10610854_hourly.csv")
 my_hobo <- my_hobo %>% 
   mutate(dttm = ymd_hms(date_time)) %>% 
   mutate(my_hobo = th) %>% 
@@ -54,7 +54,7 @@ data <- left_join(my_hobo, dwd_airport, by = "dttm") %>%
 
 ```
 
-```{r join}
+```{r long format}
 data_long <- data %>%
 pivot_longer(cols = -c(dttm), 
 names_to = "station",
