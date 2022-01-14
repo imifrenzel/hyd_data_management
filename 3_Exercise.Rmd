@@ -79,8 +79,19 @@ summary(lm(my_hobo ~ dwd_urban, data))$r.squared
 summary(lm(my_hobo ~ uni_meteo, data))$r.squared
 summary(lm(my_hobo ~ wbi, data))$r.squared
 ```
-```{r join}
+Seems like dwd_urban fits best
 
+```{r linearregression with dwd_urban}
+export <- data %>% 
+  mutate(temp = ifelse(is.na(my_hobo), 0.812342*dwd_urban+3.562775, my_hobo)) %>% 
+  mutate(origin = ifelse(is.na(my_hobo), "R", "H")) %>% 
+  select("dttm", "temp", "origin")
 ```
-## Including Plots
 
+## Export
+```{r}
+write.csv(export, file = "C:/Users/Imifr/Documents/Github/hyd_data_management/10610854_Th.csv", append = FALSE, quote = FALSE, sep = ",",
+          eol = "\n", na = "NA", dec = ".", row.names = FALSE,
+          col.names = TRUE, qmethod = c("escape", "double"),
+          fileEncoding = "")
+```

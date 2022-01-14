@@ -91,7 +91,7 @@ hobo_hourly <- qc_df %>%
   summarise(date_time = first(hour), th = round(ifelse(sum(QCP_total) < 6, NA, mean(temp)), digits = 4)) %>% 
   select("date_time", "th")
 
-write.csv(hobo_hourly, file = "C:/Users/Imifr/Documents/Github/hyd_data_management/processed10610854.csv", append = FALSE, quote = FALSE, sep = ",",
+write.csv(hobo_hourly, file = "C:/Users/Imifr/Documents/Github/hyd_data_management/10610854_hourly.csv", append = FALSE, quote = FALSE, sep = ",",
           eol = "\n", na = "NA", dec = ".", row.names = FALSE,
           col.names = TRUE, qmethod = c("escape", "double"),
           fileEncoding = "")
