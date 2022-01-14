@@ -72,9 +72,12 @@ ggplot(data = data_long, aes(x = dttm, y = temp)) +
 
 ```
 
-
-```{r join}
-
+## DWD_Urban matches best
+```{r linear models}
+summary(lm(my_hobo ~ dwd_airport, data))$r.squared
+summary(lm(my_hobo ~ dwd_urban, data))$r.squared
+summary(lm(my_hobo ~ uni_meteo, data))$r.squared
+summary(lm(my_hobo ~ wbi, data))$r.squared
 ```
 ```{r join}
 

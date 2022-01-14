@@ -32,10 +32,12 @@ rawdata <- rawdata %>%
   add_row(posDTTM = seq(ymd_hms('2022-01-09 10:40:00'), ymd_hms('2022-01-09 23:00:00'),                        
                         by = '10 mins'))
 
-#delete 2 row at 2021-12-22 because of sensor readout
+#delete 2 row at 2021-12-22 because of sensor readout,
+#set values for lux and temp to NA when sensor was inside
 rawdata <- rawdata[-c(1355, 1357), ] 
 rawdata <- rawdata %>% 
-  mutate(temp = ifelse(id %in% 3995:4236, NA, temp))
+  mutate(temp = ifelse(id %in% 3995:4236, NA, temp)) %>% 
+  mutate(lux = ifelse(id %in% 3995:4236, NA, lux))
 
 
 #shaping the exportfile

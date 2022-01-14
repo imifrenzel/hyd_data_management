@@ -8,7 +8,7 @@ library("tibbletime")
 rm(list=ls())
 
 #dataimport
-reimport <- read.csv("C:/Users/Imifr/Documents/Github/hyd_data_management/10610854.csv")
+reimport <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/10610854.csv")
 
 data <- reimport %>% 
   mutate(dttm = ymd_hm(reimport$dttm))

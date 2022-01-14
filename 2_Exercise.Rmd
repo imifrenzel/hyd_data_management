@@ -51,7 +51,7 @@ summarise(data, QCP_1 = sum(QCP_1 == 0, na.rm = TRUE))
 summary(data)
 ```
 
-**Answer**: 0, all 75 Values are NAs
+**Answer**: 0, all 317 Values are NAs
 
 
 ### 1.2 Plausible rate of change
@@ -63,7 +63,7 @@ data <- data %>%
 
 **Question**: Describe shortly how many data points failed during this QCP and discuss whether there is a certain daytime pattern of failure or not?
 
-**Answer**: 10 points failed QCP_2. Looks like it often happens before midday, but there is no clear pattern to the data.
+**Answer**: 7 points failed QCP_2. All readings are between 08:20:00	and 11:30:00. This makes sense. Qick temperature rise is expected for morning times.
 
 ```{r, eval = TRUE}
 summarise(data, QCP_2 = sum(QCP_2 == 0, na.rm = TRUE))
@@ -139,13 +139,11 @@ a <- data %>%
 ggplot(a, mapping = aes(x = name, y = value)) +
   geom_col() +
   theme_bw()
-
-summary(data)
 ```
 
 **Task**: Present a table or graph to show how many data points fail during the four specific QCPs. Discuss shortly the reasons for failure and compare the different QCPs against each other.
 
-**Answer**:  Reasons for failure were sudden temperature changes (QCP_2, 10 points) and constant temperature over at least one hour (QCP_3, 60 points). All temperature readings were in the measurement-interval (QCP_1). The sensor never experienced more than 5166.7 lux (QCP_4) which was not enough for not passing the checkpoint.
+**Answer**:  Reasons for failure were sudden temperature changes (QCP_2, 7 points) and constant temperature over at least one hour (QCP_3, 45 points). All temperature readings were in the measurement-interval (QCP_1). The sensor never experienced more than 5166.7 lux (QCP_4) which was not enough for not passing the checkpoint.
 
 ## 3. Results
 
