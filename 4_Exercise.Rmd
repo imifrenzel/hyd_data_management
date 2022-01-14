@@ -1,14 +1,24 @@
-# 4th Exercise
-# Immanunel Frenzel
-# 14.01.2021
+---
+title: "4_Exercise"
+author: "Immanuel Frenzel"
+date: "14 1 2022"
+output: html_document
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r library and clean workspace}
 library("tidyverse")
 library("lubridate")
 library("tibbletime")
 
 rm(list=ls())
-
-#import
+```
+## import
+```{r import, echo = F}
 data <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/10610854_Th.csv")
 data <- data %>% 
   mutate(dttm = ymd_hms(dttm)) %>% 
@@ -23,10 +33,10 @@ data_ex1 <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_mana
 data_ex1 <- data_ex1 %>% 
   mutate(dttm = ymd_hm(dttm)) %>% 
   tibble()
+```
 
-#values
-###tavg
-
+## tnight tday tavg
+```{r tnight tday tavg, echo=TRUE}
 tdaynight <- data %>% 
   mutate(daytime = ifelse(hour(dttm) < 6 | hour(dttm) >= 18, "night", "day")) %>% 
   group_by(daytime) %>% 
@@ -34,17 +44,21 @@ tdaynight <- data %>%
 
 tavg <- mean(data$temp)
 
-###tamp
-
+head(tdaynight)
+tavg
+```
+## tamp
+```{r tamp}
 tamp_data <- data %>%
   mutate(date = date(dttm)) %>% 
   group_by(date) %>%
   summarise(tmin = min(temp), tmax =(max(temp)))
 
 tamp = mean(tamp_data$tmax) - mean(tamp_data$tmin)
-
-###t6h
-
+tamp
+```
+## t6h
+```{r t6h}
 t6h_data <- data %>%
   mutate(t6h_1 = abs(temp - lead(temp)),
          t6h_2 = abs(temp - lead(temp, n = 2)),
@@ -55,24 +69,28 @@ t6h_data <- data %>%
   rowwise() %>%
   mutate(t6h = max(t6h_1, t6h_2, t6h_3, t6h_4, t6h_5, t6h_6, na.rm = T))
 
+head(t6h_data)
+tail(t6h_data)
+
 t6h <- max(t6h_data$t6h)
+t6h
+```
+Last value for t6h_data$t6h is -Inf due to teh algorythm, this should be no problem for futher calculation
 
-###fna
-
-fna_data_ex3 <- data_ex3 %>% #exclude nas at the end, which are due to manual cut
-  tbl_time(dttm) %>% 
-  filter_time('2021-12-13 00:00:00' ~ '2022-01-07 17:00:00')
-
-fna <- sum(is.na(fna_data_ex3$th))/length(fna_data_ex3$th)
-
-###Lavg
+## lavg
+```{r lavg}
 data_lavg <- data_ex1 %>% 
   mutate(daytime = if_else(hour(dttm) < 6 | hour(dttm) >= 18, "night", "day")) %>% 
   group_by(daytime) 
-  
-median_lux <- summarise(data_lavg, median = median(lux, na.rm = T))[1,2]
 
-###Lmax
+head(data_lavg)
+
+median_lux <- summarise(data_lavg, median = median(lux, na.rm = T))[1,2]
+median_lux
+```
+
+## lmax
+```{r lmax}
 data_lmax <- data_lavg %>% 
   ungroup() %>%
   filter(daytime == "day") %>% 
@@ -81,14 +99,8 @@ data_lmax <- data_lavg %>%
   summarise(meanlux = mean(lux, na.rm = TRUE)) %>% 
   arrange(desc(meanlux))
 
+head(data_lmax)
+
 lmax <- data_lmax[1,1]
-
-
-
-  
-
-
-
-
-
-
+lmax
+```
