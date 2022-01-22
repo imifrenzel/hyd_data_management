@@ -1,0 +1,71 @@
+---
+title: "Report_part1"
+author: "Immanuel Frenzel"
+date: "19 1 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library("lubridate")
+library("tidyverse")
+library("tibbletime")
+
+theme_set(theme_bw() +  theme(axis.text=element_text(size=20),
+        axis.title=element_text(size=20),
+        plot.title = element_text(size=20)))
+```
+
+## Hobo location
+The describtion of the place the hobo was positioned was descrieb as followed:
+"Outdoor, directly at a north window, next building only 5m away, pot. wind effects, minor sunshine"
+
+Some conclusions should be found in the data:
+* Due to the window facing north there should be no direkt sunlight hitting the hobo
+* The office behind the window could have radiated light at the hobo. This should be visible expecially
+ during the early morning and late afternoon hours, when the office is occupied and the sun has already set
+* Heat from the building could radiate. This may could shown by the comparision of meteo-station und hobo temperature data.
+```{r lightintenisty, echo=FALSE}
+#labes lightintenisities
+data <- data %>%
+  mutate(SIC = case_when(lux < 0 ~ "NA",
+                         lux < 10 ~ "night",
+                         lux < 500 ~ "sun_rise_or_set",
+                         lux < 2000 ~ "overcast_full",
+                         lux < 15000 ~ "overcast_light",
+                         lux < 20000 ~ "clear_sky_shady",
+                         lux < 50000 ~ "sunshine",
+                         lux >= 50000 ~ "sunshine_bright"))
+
+ggplot(data, aes(x = SIC)) + geom_bar() + 
+  theme_bw() +
+  coord_flip()
+
+
+```
+The plot confirms
+
+```{r lightintenisty, echo=FALSE}
+#import clean 10 min timeseries
+reimport <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/10610854.csv")
+
+#proper date format
+data <- reimport %>% 
+  mutate(dttm = ymd_hm(reimport$dttm))
+
+#labes lightintenisities
+datasumlux <- data %>%
+  mutate(hour = hour(dttm)) %>% 
+  group_by(hour) %>% 
+  summarise(lux = mean(lux, na.rm = TRUE))
+
+ggplot(datasumlux, aes(x = hour, y = lux)) + geom_point() 
+
+
+```
+It seems like
+
+

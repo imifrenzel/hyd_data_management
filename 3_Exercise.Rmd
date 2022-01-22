@@ -83,9 +83,9 @@ Seems like dwd_urban fits best
 
 ```{r linearregression with dwd_urban}
 export <- data %>% 
-  mutate(temp = ifelse(is.na(my_hobo), 0.812342*dwd_urban+3.562775, my_hobo)) %>% 
+  mutate(th = ifelse(is.na(my_hobo), round(0.812342*dwd_urban+3.562775, 3), round(my_hobo, 3))) %>% 
   mutate(origin = ifelse(is.na(my_hobo), "R", "H")) %>% 
-  select("dttm", "temp", "origin")
+  select("dttm", "th", "origin")
 ```
 
 ## Export

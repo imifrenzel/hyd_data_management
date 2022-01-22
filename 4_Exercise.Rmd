@@ -2,7 +2,7 @@
 title: "4_Exercise"
 author: "Immanuel Frenzel"
 date: "14 1 2022"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -85,7 +85,7 @@ data_lavg <- data_ex1 %>%
 
 head(data_lavg)
 
-median_lux <- summarise(data_lavg, median = median(lux, na.rm = T))[1,2]
+median_lux <- summarise(data_lavg, median = median(lux, na.rm = T))
 median_lux
 ```
 

@@ -1,0 +1,138 @@
+---
+title: "Report_part1"
+author: "Immanuel Frenzel"
+date: "19 1 2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("lubridate")
+library("tidyverse")
+library("tibbletime")
+
+theme_set(theme_bw() +  theme(axis.text=element_text(size=15),
+        axis.title=element_text(size=15),
+        plot.title = element_text(size=15),
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        plot.background=element_blank()))
+
+#import clean 10 min timeseries
+reimport <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/10610854.csv")
+
+#proper date format
+data <- reimport %>% 
+  mutate(dttm = ymd_hm(reimport$dttm))
+```
+
+## Hobo location
+The description of the place the hobo was positioned was described as followed:
+
+> "Outdoor, directly at a north window, next building only 5m away, pot. wind effects, minor sunshine" 
+
+This show show in the data:
+
+- Due to the window facing north there should be no direct sunlight hitting the hobo
+- The office behind the window could have radiated light at the hobo. This should be visible expecially during the early morning and late afternoon hours, when the office is still occupied and the sun has already set.
+- Heat from the building could radiate. This may could shown by the comparision of meteo-station und hobo temperature data.
+
+```{r lightintenisty_1, echo=FALSE}
+#labes lightintenisities
+data <- data %>%
+  mutate(SIC = case_when(lux < 10 ~ "night",
+                         lux < 500 ~ "sun_rise_or_set",
+                         lux < 2000 ~ "overcast_full",
+                         lux < 15000 ~ "overcast_light",
+                         lux < 20000 ~ "clear_sky_shady",
+                         lux < 50000 ~ "sunshine",
+                         lux >= 50000 ~ "sunshine_bright")) %>% 
+  drop_na()
+
+ggplot(data, aes(x = SIC)) + 
+  geom_bar(width = 0.7, fill="white", color="black") + 
+  scale_x_discrete(limits = c("night", "sun_rise_or_set", "overcast_full", "overcast_light")) +
+  coord_flip() 
+
+
+```
+*Plot 1* shows a split light intensities in categories: No more than dim light reaches the hobo, most likely due to the hobo facing north. Also the next building could have a shadowing effect.
+
+```{r lightintenisty_2, echo=FALSE}
+datasumlux <- data %>%
+  mutate(hour = hour(dttm)) %>% 
+  group_by(hour) %>% 
+  summarise(lux = mean(lux, na.rm = TRUE))
+
+ggplot(datasumlux, aes(x = hour, y = lux)) + geom_point()  +
+   ggtitle("plot 2: light influences")
+
+```
+*Plot 2* shows a mean of hourly light data over the measurement period. First lights touches the hobo at 8 AM. This is ahead of sun dawn (earliest in measuring period 8:10 AM). At 5 PM the hobo measures no light anymore. Earliest sunset during measurung period 5:00 PM. Seems like if the light data was influend by human light it was during the morning hours.
+
+```{r cleanspace, echo = FALSE}
+rm(list=ls())
+
+my_hobo <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/10610854_hourly.csv")
+my_hobo <- my_hobo %>% 
+  mutate(dttm = ymd_hms(date_time)) %>% 
+  mutate(my_hobo = th) %>% 
+  select("dttm", "my_hobo")
+
+dwd_airport <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/dwd_airport.csv")
+dwd_airport <- dwd_airport %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+dwd_urban <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/dwd_urban.csv")
+dwd_urban <- dwd_urban %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+uni_meteo <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/uni_meteo.csv")
+uni_meteo <- uni_meteo %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+wbi <- read.csv("https://raw.githubusercontent.com/jasperschalla/station_data/master/wbi.csv")
+wbi <- wbi %>% 
+  mutate(dttm = ymd_hms(dttm))
+
+data <- left_join(my_hobo, dwd_airport, by = "dttm") %>% 
+  left_join(., dwd_urban, by = "dttm") %>% 
+  left_join(., uni_meteo, by = "dttm") %>% 
+  left_join(., wbi, by = "dttm")
+
+data_long <- data %>%
+pivot_longer(cols = -c(dttm), 
+names_to = "station",
+values_to = "temp")
+
+ggplot(data = data_long, aes(x = dttm, y = temp)) +
+  geom_line(aes(lty = station, colour = station)) +
+  theme_bw() +
+  labs(title = "Comparison across stations",
+    x = "Date", y = "Temperature C")
+```
+*Plot 3* Shows the temperature over time for all measuremtstytions an the hobo. Compared to the best fitting option dwd_urban and all other weather stations, the hobo temperature readings seems tob be about 2 to 3 degrees to high. The linear fit confirms this. 
+
+```{r linear fit}
+summary(lm(my_hobo ~ dwd_urban, data))
+```
+
+The offset is roughly 3,5 degrees below dwd_urban. The cause for this seems to be the close by building wich radiates enough heat to rise the temperature around the hobo. Wind could have reduce this effect for certain periods.
+
+##Comparison of different hobo data
+
+```{r metasheet, echo=FALSE}
+metadata <- gsheet2tbl('https://docs.google.com/spreadsheets/d/1uvI1a_OOnCcFjUbHAO1N5nEWejnI5y5vCNt6eueHrOc/edit#gid=490997971')
+
+a <- metadata %>% 
+  filter(hobo_id != 10610854) %>% 
+  summarise_all(mean, na.rm =T)
+a <- a %>% select(hobo_id:f_na, ref_r2)
+
+b <- add_row(a, select(filter(metadata, hobo_id == 10610854), hobo_id:f_na, ref_r2))
+b <- b %>% 
+  mutate(x = c("average", "my_hobo")) %>% 
+  select(x, t_avg:ref_r2)
+```
+
