@@ -1,5 +1,5 @@
-select r.meta_id as m_id, r.variable_id as v_id, r.tstamp as dttm, r.value as lux, rd.value as temp,
-	m.location, device_id,
+create view raw_data_lux as
+select r.value as lux, rd.value as temp, r.tstamp, r.meta_id,
 	case
 		when r.value <= 10 then '1'
 		when r.value <= 500 then '2'
@@ -17,5 +17,6 @@ join raw_data as rd on r.tstamp=rd.tstamp
 	and rd.variable_id = 1 --join only temperature
 join metadata as m on r.meta_id=m.id 
 where r.variable_id = 2 
+
 
 
