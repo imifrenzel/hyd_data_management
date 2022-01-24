@@ -1,4 +1,4 @@
-create view raw_data_lux as
+with raw_data_lux as(
 with meta_loc as (
 	select *,  me.id as id_metadata, osm_nodes.id as id_osm
 	from metadata me
@@ -22,15 +22,14 @@ with meta_loc as (
 		and rd.meta_id=r.meta_id --stamp und meta_id provide a unique id
 		and rd.variable_id = 1 --join only temperature
 	join meta_loc as m on r.meta_id=m.id_metadata 
-	where r.variable_id = 2;
+	where r.variable_id = 2),
 
-create view raw_data_dis as
+raw_data_dis as(
 select avg(temp) as avgtemp, name, category, count(temp) as n
 from raw_data_lux rdl
-group by name, category;
+group by name, category),
 
-create view data_plot_1 as
-with meantemp as (
+meantemp as (
 	select avg(temp) as avgtemp, name
 	from raw_data_lux
 	group by name

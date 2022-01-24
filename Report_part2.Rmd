@@ -1,0 +1,265 @@
+---
+title: "Report_part2"
+author: "Immanuel Frenzel"
+date: "24 1 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("tidyverse")
+library("viridis")
+library("DBI")
+
+db <- "hydenv"
+host_db <- "localhost"  
+db_port <- 5432
+db_user <- "hydenv"  
+db_password <- "hydenv"
+con <- dbConnect(RPostgres::Postgres(), dbname = db, host=host_db, port=db_port, user=db_user, password=db_password)
+
+knitr::opts_chunk$set(connection = "con")
+```
+##Disclaimer
+My 7 Year old laptop had troubles computing the tasks for this exercise. The decision was made to compute the tasks only with data of the winter semesters 2021 and 2022. The code should work just fine for all available years on more potent computers.
+
+## Overview
+```{sql overview}
+with base_data as (
+	select * from data d
+	join metadata m on d.meta_id=m.id
+	where variable_id=1
+),
+mean_temperature as (
+	select 
+		base_data.id,
+		avg(value) as t_avg
+	from base_data
+	group by base_data.id
+),
+day_temperature as (
+	select
+		base_data.id,
+		avg(value) as t_day
+	from base_data
+	where date_part('hour', tstamp) >= 6 and date_part('hour', tstamp) < 18
+	group by base_data.id
+),
+night_temperature as (
+	select
+		id,
+		avg(value) as t_night
+	from base_data
+	group by base_data.id
+	
+),
+var as (
+	select 
+		t.id,
+		t_var
+	from (
+		select base_data.id,
+		date_trunc('day', tstamp) as day,
+		stddev_samp(value) as t_var
+		from base_data
+		group by base_data.id, date_trunc('day', tstamp)
+	) t
+),
+amount as (
+	select id, count(*) as "N" from base_data group by id
+)
+select 
+	m.id,
+	device_id,
+	avg(mean_temperature.t_avg) as tavg,
+	avg(day_temperature.t_day) as tavg_day,
+	avg(night_temperature.t_night) as tavg_night,
+	avg(var.t_var) as t_var,
+	min(amount."N") as N,
+	location
+from metadata m
+join mean_temperature on m.id=mean_temperature.id
+join day_temperature on m.id=day_temperature.id
+join night_temperature on m.id=night_temperature.id
+join amount on m.id=amount.id
+join var on m.id=var.id
+group by m.id, device_id, location
+order by m.id asc
+```
+
+## Categorize light intensity for bulk statistics 
+- Min Threshold was applied to 10, everything below counts as night
+- No Threshold needed for max values. Everything above 50000 lux is bright daylight. Even if some influence (exp. a window is reflecting additional sunlight on the hobo) its still bright sunlight.
+- 7 Categories were used, the first 2 were measured by every hobo station:
+
+cat no. | cat              |light-intenity in lux
+--------|------------------|----------------------
+1       | NIGHT            | < 10
+2       | SUNRISE OR SET   | < 500
+3       | OVERCAST FULL    | < 2000
+4       | OVERCAST LIGHT   | < 15000
+5       | CLEAR SKY SHADY  | < 20000
+6       | SUNSHINE         | < 50000
+7       | SUNSHINE BRIGHT  | >= 50000
+
+-Static categories were used for a reasonable frame of light measurements (0 - 120000). Measurements over 120000 lux should be filtered out previously due to a high possibility for false measurements. 
+
+## Applying categories
+```{sql categories}
+select r.value as lux, rd.value as temp, r.tstamp, r.meta_id,
+	case
+		when r.value <= 10 then '1'
+		when r.value <= 500 then '2'
+		when r.value <= 2000 then '3'
+		when r.value <= 15000 then '4'
+		when r.value <= 20000 then '5'
+		when r.value <= 50000 then '6'
+		when r.value > 50000 then '7'
+	end 
+	as category
+
+from raw_data as r
+join raw_data as rd on r.tstamp=rd.tstamp 
+	and rd.meta_id=r.meta_id --stamp und meta_id provide a unique id
+	and rd.variable_id = 1 --join only temperature
+join metadata as m on r.meta_id=m.id 
+where r.variable_id = 2 
+limit 100
+```
+
+##Temperature in the shed of light
+
+- The amount of locations present in a category (cat) is reduces the higher the category number (the light intensity). This is due not every hobo experiences direct sunlight.
+- Variance in light-intensity should be proportional to the category size. Cat 4 is bigger than cat 5 an therefore has a higher variance in light.
+- Temperature variance increases with cat number. Cat 5 is an exception. There a remarkably few values in this cat. This could be an explanation for this high temperature variance.
+- Interestingly there are no light between 0 and 10. So within the 10 min measurement interval light intensity always rises more then 10 lux above 0.
+
+
+```{sql categories aggregated}
+select avg(r.value) as lux_mean, stddev_samp(r.value) as lux_var, avg(rd.value) as temp_mean, 
+	   stddev_samp(rd.value) as temp_var, 
+	   count(r.value) as values_count,
+	   count(distinct location) as diff_location_count,
+	case
+		when r.value <= 10 then '1'
+		when r.value <= 500 then '2'
+		when r.value <= 2000 then '3'
+		when r.value <= 15000 then '4'
+		when r.value <= 20000 then '5'
+		when r.value <= 50000 then '6'
+		when r.value > 50000 then '7'
+	end 
+	as category
+
+from raw_data as r
+join raw_data as rd on r.tstamp=rd.tstamp 
+	and rd.meta_id=r.meta_id --stamp und meta_id provide a unique id
+	and rd.variable_id = 1 --join only temperature
+join metadata as m on r.meta_id=m.id 
+where r.variable_id = 2 
+group by category 
+```
+
+
+```{sql light values between 0 and 10}
+select *
+from raw_data
+where variable_id = 2 and value < 10 and value > 0
+```
+
+##spatial differences
+
+```{sql data for plot1}
+--saved to github for plotting in r
+with raw_data_lux as(
+with meta_loc as (
+	select *,  me.id as id_metadata, osm_nodes.id as id_osm
+	from metadata me
+	join osm_nodes on st_within(me.location, osm_nodes.geom))
+	
+	select r.value as meanlux, rd.value as temp, r.tstamp, r.meta_id, name, location,
+	case
+		when r.value <= 10 then '1'
+		when r.value <= 500 then '2'
+		when r.value <= 2000 then '3'
+		when r.value <= 15000 then '4'
+		when r.value <= 20000 then '5'
+		
+		when r.value <= 50000 then '6'
+		when r.value > 50000 then '7'
+	end 
+	as category, m.geom
+
+	from raw_data as r
+	join raw_data as rd on r.tstamp=rd.tstamp 
+		and rd.meta_id=r.meta_id --stamp und meta_id provide a unique id
+		and rd.variable_id = 1 --join only temperature
+	join meta_loc as m on r.meta_id=m.id_metadata 
+	where r.variable_id = 2),
+
+raw_data_dis as(
+select avg(temp) as avgtemp, name, category, count(temp) as n
+from raw_data_lux rdl
+group by name, category),
+
+meantemp as (
+	select avg(temp) as avgtemp, name
+	from raw_data_lux
+	group by name
+	)
+select mt.avgtemp, rdl.name,  rdl.category, rdl.n
+from raw_data_dis as rdl
+join meantemp as mt on mt.name=rdl.name
+
+```
+
+```{r plot 1}
+#dataimport
+data <- read.csv("https://raw.githubusercontent.com/imifrenzel/hyd_data_management/main/data_plot_1.csv")
+
+#wrangling
+data <- data %>% 
+  mutate(category = case_when(category == 1 ~ "night",
+                              category == 2 ~ "sun_rise_or_set",
+                              category == 3 ~ "overcast_full",
+                              category == 4 ~ "overcast_light",
+                              category == 5 ~ "clear_sky_shady",
+                              category == 6 ~ "sunshine",
+                              category == 7 ~ "sunshine_bright"))
+
+data_2 <- data %>% 
+  group_by(name) %>% 
+  summarise(avgtemp = min(avgtemp)/10) %>% 
+  ungroup()
+
+#plot
+ggplot(data = data) +
+  geom_col(mapping = aes(x = name, y = n, fill  = factor(category, levels = c("night",
+                                                                          "sun_rise_or_set",
+                                                                          "overcast_full",
+                                                                          "overcast_light",
+                                                                          "clear_sky_shady",
+                                                                          "sunshine",
+                                                                          "sunshine_bright"))), position = "fill") +
+  geom_point(data = data_2, mapping = aes(x = name, y = avgtemp), shape = 3, color = "white", size = 2) +
+  scale_color_viridis(discrete = TRUE, option = "D") +
+  scale_fill_viridis(discrete = TRUE) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  labs(fill = "light") +
+  xlab("") +
+  ylab("percent of measurements") +
+  scale_y_continuous(sec.axis = sec_axis(~.*10, name="mean temperature °C"))
+```
+- The concept: Higher light intensity - higher mean temperature, which was true for the whole data set, does not apply anymore when the data is grouped by districts. For example Littenweiler seems darker than Kappel, but has a higher mean temperature. 
+- Here the direct surrounding of the hobos seem to have a much higher impact on the mean temperature than the district. 
+- Taking the low measurements for Waldsee an Kappel into account information about altitude would be very interesting. Does temperature decrease with altitude in the city of Freiburg?
+- More densly build up districts seem to have higher mean temperature.
+  
+  
+
+
+  
+  
+
+
